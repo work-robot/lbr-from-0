@@ -10,12 +10,15 @@ USER_LDLIBS := $(shell pkg-config --libs libbpf libelf zlib)
 USER_CPPFLAGS := -Isrc $(shell pkg-config --cflags libbpf)
 EXERCISE_LDFLAGS := -static
 
+.DELETE_ON_ERROR:
+
 .PHONY: all clean
 
 all: lbr_snapshot exercise filler
 
 src/lbr_snapshot.skel.h: src/lbr_snapshot.bpf.o
-	$(BPFTOOL) gen skeleton $< > $@
+	$(BPFTOOL) gen skeleton $< > $@.tmp
+	mv $@.tmp $@
 
 src/lbr_snapshot.bpf.o: src/lbr_snapshot.bpf.c src/common.h
 	$(CLANG) $(BPF_CFLAGS) $(BPF_SYS_INCLUDES) -Isrc -c $< -o $@
