@@ -1,6 +1,6 @@
 CLANG ?= clang
 CC ?= cc
-BPFTOOL ?= /home/d065349/WSL2-Linux-Kernel/tools/bpf/bpftool/bpftool
+BPFTOOL ?= /usr/sbin/bpftool
 
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/')
 BPF_SYS_INCLUDES := -I/usr/include -I/usr/include/$(shell uname -m)-linux-gnu
