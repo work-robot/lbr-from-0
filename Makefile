@@ -34,7 +34,9 @@ exercise: src/exercise.c
 filler: src/filler.c
 	@# Note: don't compile with optimizations, because we just need to fill the LBR with some entries.
 	@#       The code is currently pretty much a no-op, so the compiler might optimize it away.
-	$(CC) $(USER_CFLAGS) $< -o $@
+	@# Note: compiling as position-independent so we can clearly distinguish these addresses
+	@#       from the addresses of the exercise progrma.
+	$(CC) -fPIE $(USER_CFLAGS) $< -o $@ -pie
 
 clean:
 	rm -f lbr_snapshot exercise filler src/lbr_snapshot.bpf.o src/lbr_snapshot.skel.h
