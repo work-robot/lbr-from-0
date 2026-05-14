@@ -8,7 +8,6 @@ BPF_CFLAGS := -target bpf -D__TARGET_ARCH_$(ARCH) -O2 -g -Wall -Werror
 USER_CFLAGS := -O2 -g -Wall -Wextra -Werror
 USER_LDLIBS := $(shell pkg-config --libs libbpf libelf zlib)
 USER_CPPFLAGS := -Isrc $(shell pkg-config --cflags libbpf)
-EXERCISE_LDFLAGS := -static
 
 .DELETE_ON_ERROR:
 
@@ -26,10 +25,8 @@ src/lbr_snapshot.bpf.o: src/lbr_snapshot.bpf.c src/common.h
 lbr_snapshot: src/lbr_snapshot.c src/lbr_snapshot.skel.h src/common.h
 	$(CC) $(USER_CFLAGS) $(USER_CPPFLAGS) $< $(USER_LDLIBS) -o $@
 
-exercise: src/exercise.c
-	@# Note: this must be linked statically to generate addresses in LBR that are easier to interpret:
-	@#       all addresses will refer to the executable image (no shared libraries with dedicated mappings).
-	$(CC) $(USER_CFLAGS) $< $(EXERCISE_LDFLAGS) -o $@
+exercise: src/exercise.S
+	$(CC) -nostdlib -static -g $< -o $@
 
 clean:
 	rm -f lbr_snapshot exercise src/lbr_snapshot.bpf.o src/lbr_snapshot.skel.h
