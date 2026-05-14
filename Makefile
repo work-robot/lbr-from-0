@@ -14,7 +14,7 @@ EXERCISE_LDFLAGS := -static
 
 .PHONY: all clean
 
-all: lbr_snapshot exercise filler
+all: lbr_snapshot exercise
 
 src/lbr_snapshot.skel.h: src/lbr_snapshot.bpf.o
 	$(BPFTOOL) gen skeleton $< > $@.tmp
@@ -31,12 +31,5 @@ exercise: src/exercise.c
 	@#       all addresses will refer to the executable image (no shared libraries with dedicated mappings).
 	$(CC) $(USER_CFLAGS) $< $(EXERCISE_LDFLAGS) -o $@
 
-filler: src/filler.c
-	@# Note: don't compile with optimizations, because we just need to fill the LBR with some entries.
-	@#       The code is currently pretty much a no-op, so the compiler might optimize it away.
-	@# Note: compiling as position-independent so we can clearly distinguish these addresses
-	@#       from the addresses of the exercise progrma.
-	$(CC) -fPIE $(USER_CFLAGS) $< -o $@ -pie
-
 clean:
-	rm -f lbr_snapshot exercise filler src/lbr_snapshot.bpf.o src/lbr_snapshot.skel.h
+	rm -f lbr_snapshot exercise src/lbr_snapshot.bpf.o src/lbr_snapshot.skel.h

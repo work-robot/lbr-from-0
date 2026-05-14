@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/perf_event.h>
-#include <signal.h>
+#include <spawn.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -12,6 +12,7 @@
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <bpf/libbpf.h>
@@ -22,14 +23,14 @@
 /*
 lbr_snapshot <cpu>
 
-This program enables LBR on the specified CPU,loads the lbr_snapshot.bpf.c BPF program into the kernel, and listens for
-events on the ring buffer. When an event is received, it prints the event as a JSON object in a single line to stdout.
+This program enables LBR on the specified CPU, loads the lbr_snapshot.bpf.c BPF program into the kernel, spawns the
+exercise binary, waits for it to finish, and then polls the ring buffer for the LBR snapshot event. The event is printed
+as a JSON object to stdout.
 
 Set the environment variable LBR_PRINT_BRANCH_DETAILS to a non-empty value to also print the additional details for each
 branch record.
 */
 
-static volatile sig_atomic_t exiting;
 static bool print_branch_details;
 
 static void abort_errno(const char *what)
@@ -69,12 +70,6 @@ static long perf_event_open_cpu_lbr(int cpu)
         abort_errno("ioctl(PERF_EVENT_IOC_ENABLE)");
 
     return fd;
-}
-
-static void sig_handler(int signo)
-{
-    (void)signo;
-    exiting = 1;
 }
 
 static int handle_event(void *ctx, void *data, size_t data_sz)
@@ -144,6 +139,8 @@ int main(int argc, char **argv)
     int perf_fd;
     int cpu;
     int err;
+    pid_t child_pid;
+    int status;
 
     if (argc != 2)
         abort_msg("usage: lbr_snapshot <cpu>");
@@ -176,15 +173,27 @@ int main(int argc, char **argv)
     if (!ring_buffer)
         abort_msg("ring_buffer__new failed");
 
-    signal(SIGINT, sig_handler);
-    signal(SIGTERM, sig_handler);
+    /* Spawn the exercise binary */
+    {
+        char *child_argv[] = { "./exercise", NULL };
+        extern char **environ;
 
-    while (!exiting) {
-        err = ring_buffer__poll(ring_buffer, 250);
-        if (err < 0) {
-            errno = -err;
-            abort_errno("ring_buffer__poll");
+        err = posix_spawn(&child_pid, "./exercise", NULL, NULL, child_argv, environ);
+        if (err != 0) {
+            errno = err;
+            abort_errno("posix_spawn");
         }
+    }
+
+    /* Wait for exercise to finish */
+    if (waitpid(child_pid, &status, 0) < 0)
+        abort_errno("waitpid");
+
+    /* Poll ring buffer to collect the snapshot */
+    err = ring_buffer__poll(ring_buffer, 100);
+    if (err < 0) {
+        errno = -err;
+        abort_errno("ring_buffer__poll");
     }
 
     ring_buffer__free(ring_buffer);
